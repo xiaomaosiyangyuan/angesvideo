@@ -28,6 +28,12 @@ class TestReadTasks:
         # Row 3: num_frames is 241, seed is empty
         assert tasks[2].seed is None
 
+    def test_single_image_parsing(self) -> None:
+        tasks = read_tasks(str(FIXTURES / "single_image.csv"))
+        assert len(tasks) == 1
+        assert tasks[0].image == ["https://example.com/dog.jpg"]
+        assert tasks[0].prompt == "A dog running on grass"
+
     def test_multi_image_parsing(self) -> None:
         tasks = read_tasks(str(FIXTURES / "multi_image.csv"))
         assert len(tasks) == 1

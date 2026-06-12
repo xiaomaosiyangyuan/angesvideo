@@ -50,6 +50,38 @@ class TestAgnesClient:
             client.submit_task(TaskConfig(prompt="test"))
 
     @patch("api_client.requests.Session")
+    def test_submit_single_image_sends_string(self, mock_session_cls: Mock) -> None:
+        mock_session = Mock()
+        mock_session_cls.return_value = mock_session
+        mock_session.post.return_value.ok = True
+        mock_session.post.return_value.json.return_value = {"video_id": "vid_1"}
+
+        from api_client import AgnesClient
+        client = AgnesClient(api_key="test-key")
+        task = TaskConfig(prompt="test", image=["https://example.com/img.jpg"])
+
+        client.submit_task(task)
+        body = mock_session.post.call_args[1]["json"]
+        assert body["image"] == "https://example.com/img.jpg"
+        assert isinstance(body["image"], str)
+
+    @patch("api_client.requests.Session")
+    def test_submit_multi_image_sends_array(self, mock_session_cls: Mock) -> None:
+        mock_session = Mock()
+        mock_session_cls.return_value = mock_session
+        mock_session.post.return_value.ok = True
+        mock_session.post.return_value.json.return_value = {"video_id": "vid_1"}
+
+        from api_client import AgnesClient
+        client = AgnesClient(api_key="test-key")
+        task = TaskConfig(prompt="test", image=["a.jpg", "b.jpg", "c.jpg"])
+
+        client.submit_task(task)
+        body = mock_session.post.call_args[1]["json"]
+        assert body["image"] == ["a.jpg", "b.jpg", "c.jpg"]
+        assert isinstance(body["image"], list)
+
+    @patch("api_client.requests.Session")
     def test_submit_fills_defaults(self, mock_session_cls: Mock) -> None:
         mock_session = Mock()
         mock_session_cls.return_value = mock_session

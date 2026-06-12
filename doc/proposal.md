@@ -111,6 +111,16 @@ A robot dancing in rain,1152,768,81,30,,https://example.com/robot.jpg,
 Cinematic drone shot over mountains,1920,1080,241,24,,,
 ```
 
+**各模式 CSV 写法对照：**
+
+| 模式 | `image` 列 | `mode` 列 | `extra_body_image` 列 | `extra_body_mode` 列 |
+|------|-----------|-----------|----------------------|---------------------|
+| Text-to-Video | 留空 | 留空 | 留空 | 留空 |
+| Image-to-Video | 单 URL | 留空 | 留空 | 留空 |
+| Multi-Image | URL1\|URL2\|URL3 | 留空 | 留空 | 留空 |
+| Keyframe | 留空 | 留空 | URL1\|URL2\|URL3 | keyframes |
+| ti2vid 模式 | 单 URL | ti2vid | 留空 | 留空 |
+
 ### 3.6 输出规范
 
 - 所有视频下载到 `--output` 指定目录（默认 `./output/`）

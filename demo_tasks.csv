@@ -1,3 +1,4 @@
-prompt,width,height,num_frames,frame_rate
-"A cinematic shot of a cat walking on the beach at sunset, warm golden lighting, realistic motion",1152,768,81,24
-"A robot dancing in the rain, cyberpunk style, neon lights",1152,768,81,24
+prompt,width,height,num_frames,frame_rate,image
+"A cinematic shot of a cat walking on the beach at sunset, warm golden lighting, realistic motion",1152,768,81,24,
+"A robot dancing in the rain, cyberpunk style, neon lights",1152,768,81,24,
+"An old castle at dawn, mist rising from the ground, cinematic lighting",1152,768,81,24,https://example.com/castle.jpg
