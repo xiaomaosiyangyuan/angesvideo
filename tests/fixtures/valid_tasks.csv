@@ -1,0 +1,4 @@
+prompt,width,height,num_frames,frame_rate,seed,image,negative_prompt,mode,extra_body_image,extra_body_mode
+A cat walking on beach at sunset,1152,768,121,24,42,,blurry,,,
+A robot dancing in rain,1152,768,81,30,,https://example.com/robot.jpg,,,,
+Cinematic drone shot over mountains,1920,1080,241,24,,,ugly,,,

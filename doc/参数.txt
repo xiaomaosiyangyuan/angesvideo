@@ -1,0 +1,107 @@
+Here is a comprehensive structured summary of all information extracted from the Agnes Video V2.0 API documentation (Spanish version):
+1. MODEL OVERVIEW
+Field	Value
+Model ID	agnes-video-v2.0
+API Endpoint	POST https://apihub.agnes-ai.com/v1/videos
+API Type	Asynchronous (task-based)
+Query Result	GET https://apihub.agnes-ai.com/agnesapi?video_id=<VIDEO_ID> (preferred) or GET https://apihub.agnes-ai.com/v1/videos/{task_id} (legacy)
+2. VIDEO DURATION & FRAME CONSTRAINTS
+Property	Details
+Formula	seconds = num_frames / frame_rate
+Max num_frames	<= 441
+num_frames rule	Must follow the formula 8n + 1 (i.e., valid values: 9, 17, 25, 33, 41, 49, 57, 65, 73, 81, ..., up to 441)
+frame_rate range	1 ~ 60 FPS
+Predefined Duration Presets (at 24 FPS)
+Duration	num_frames	frame_rate
+~3 seconds	81	24
+~5 seconds (default)	121	24
+~10 seconds	241	24
+~18 seconds (max)	441	24
+3. ALL PARAMETERS
+Parameter	Type	Required	Default	Description
+model	string	Yes	—	Must be "agnes-video-v2.0"
+prompt	string	No	—	Text prompt describing the video to generate
+height	integer	No	768	Video height in pixels
+width	integer	No	1152	Video width in pixels
+num_frames	integer	No	121 (~5s)	Number of frames. Must be <= 441 and follow 8n + 1 rule
+frame_rate	number	No	24	Frames per second. Supported range: 1 ~ 60
+image	string / array	No	—	Single image URL (Image-to-Video mode) or array of image URLs (Multi-Image mode)
+negative_prompt	string	No	—	Negative prompt describing content to avoid
+seed	integer	No	—	Random seed for reproducible results
+mode	string	No	—	Generation mode: "ti2vid" or "keyframes"
+extra_body.image	array	No	—	Array of image URLs for Multi-Image Video or Keyframe Animation
+extra_body.mode	string	No	—	Additional mode config, e.g., "keyframes"
+4. PRICING
+Price Type	Type	Standard Price
+Current Price	Video Duration	$0 / second
+Standard Price	Video Duration	$0.005 / second
+Note: The documentation lists both a "Current Price" of $0 / second and a "Standard Price" of $0.005 / second, suggesting either a promotional period or a current free tier with a standard rate established for the future.
+5. CAPABILITIES (Workflows)
+Capability	Description
+Text-to-Video	Generate videos directly from text prompts
+Image-to-Video	Convert a static image into an animated video
+Multi-Image Video Generation	Use multiple reference images to guide video generation
+Keyframe Animation	Generate smooth transitions between multiple keyframes
+Scene Motion Control	Control subject actions, camera movement, and scene dynamics via prompts
+Visual Consistency	Maintain consistency of subject, style, and scene across frames
+Cinematic Output	Generate high-quality videos with cinematic style
+Asynchronous API	Submit a task first, then query the generated result later
+6. API REQUEST/RESPONSE FORMAT
+Example Request (Text-to-Video)
+curl -X POST https://apihub.agnes-ai.com/v1/videos \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "agnes-video-v2.0",
+    "prompt": "A cinematic shot of a cat walking on the beach at sunset, soft ocean waves, warm golden lighting, realistic motion",
+    "height": 768,
+    "width": 1152,
+    "num_frames": 121,
+    "frame_rate": 24
+  }'
+Response Format (Initial)
+{
+  "id": "task_YOUR_TASK_ID",
+  "task_id": "task_YOUR_TASK_ID",
+  "video_id": "video_YOUR_VIDEO_ID",
+  "object": "video",
+  "model": "agnes-video-v2.0",
+  "status": "queued",
+  "progress": 0,
+  "created_at": 1780457477,
+  "seconds": "10.0",
+  "size": "1280x768"
+}
+Response Fields
+Field	Type	Description
+id	string	Task ID
+task_id	string	Task ID (same as id, legacy support)
+video_id	string	Recommended ID for querying the video result
+object	string	Always "video"
+model	string	Model used for generation
+status	string	Status of the task (e.g., "queued", "processing", "completed", "failed")
+progress	integer	Progress percentage (0-100)
+created_at	integer	Unix timestamp of creation
+seconds	string	Video duration in seconds
+size	string	Video resolution (e.g., "1280x768")
+remixed_from_video_id	string	(When applicable) Source video URL if remixed
+error	string	(When applicable) Error message if failed
+7. RECOMMENDED SCENARIOS & CONFIGURATIONS
+Scenario	Recommended Configuration
+Standard video generation	width: 1152, height: 768, num_frames: 121, frame_rate: 24
+Short social media video	num_frames: 81 (3s) or 121 (5s), frame_rate: 24
+Longer video	Increase num_frames or reduce frame_rate
+Smoother motion	Use frame_rate: 24 or 30
+Reproducible results	Set a fixed seed
+Keyframe transition	Use extra_body.mode: "keyframes" with extra_body.image array
+Avoid unwanted content	Use negative_prompt
+8. USE CASES
+Use Case	Examples
+Storytelling	Short films, character scenes, narrative clips
+Marketing videos	Product ads, campaign videos, promotional content
+Social media content	Reels, Shorts, TikTok-style clips
+Image animation	Animate portraits, products, characters, or scenes
+Product demonstrations	Generate product presentation videos from text or images
+Keyframe transitions	Create smooth transitions between different visual states
+Game/app assets	Generate dynamic visual assets for digital products
+Immersive content	AI-generated cinematic scenes and atmospheres

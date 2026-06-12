@@ -1,0 +1,5 @@
+﻿file 'output\0001_Low angle wide shot_20260612_024845.mp4'
+file 'output\0002_Medium shot tracking_20260612_025043.mp4'
+file 'output\0003_Medium shot fixed on_20260612_025230.mp4'
+file 'output\0004_Locked medium shot f_20260612_025357.mp4'
+file 'output\0005_Wide aerial shot pul_20260612_025524.mp4'

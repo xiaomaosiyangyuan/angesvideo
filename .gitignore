@@ -1,0 +1,10 @@
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+*.mp4
+*.log
+output/
+key.txt
+api_test_output.mp4

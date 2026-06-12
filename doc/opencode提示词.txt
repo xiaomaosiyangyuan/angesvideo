@@ -1,0 +1,90 @@
+我目标：我希望用Python开发一个能批量调用agnes-video-v2.0模型来生成视频的东西现在帮我完成需求文档。输入：C:\Users\Administrator\Documents\trae_projects\opencode下有key输出：请在doc文件夹下生成需求文档proposal.md步骤：1. 我不了解任何相关知识，请使用提问的方式帮助我确认需求。2. 不要猜测我的意图。任何不明确的地方都必须都向我提问。3. 所有确认的需求，都整理到doc/proposal.md中，作为项目的唯一需求依据。
+
+
+## 二、生成概要设计文档（可选，已包含在流程中）
+```
+目标：
+根据需求文档生成概要设计文档。
+
+输入：
+需求文档 doc/proposal.md
+
+输出：
+概要设计文档 doc/high-level-design.md
+
+步骤：
+1. 根据需求文档的内容，划分出模块，识别模块与模块之间的关系。
+2. 生成概要设计文档，明确各模块的职责和依赖关系。
+3. 不要猜测我的意图。任何不明确的地方都必须都向我提问。
+```
+
+---
+
+## 三、生成详细设计文档
+```
+目标：
+根据需求文档生成详细设计文档。
+
+输入：
+需求文档 doc/proposal.md
+
+输出：
+详细设计文档 doc/detailed-design.md
+
+步骤：
+1. 根据需求文档的内容，根据里面划分出的模块编写详细设计文档。
+2. 模块与模块之间尽量保持相互独立，可以独立进行测试。
+3. 文档中需明确每个模块的接口、输入输出、依赖关系和测试要点。
+4. 不要猜测我的意图。任何不明确的地方都必须都向我提问。
+```
+
+---
+
+## 四、划分最小可执行任务
+```
+目标：
+为每个模块划分最小可执行任务，方便后续启动多个Agent并行开发。
+
+输入：
+需求文档 doc/proposal.md
+详细设计 doc/detailed-design.md
+
+输出：
+任务列表
+- doc/tasks/<module-name>.md（每个模块对应一个）
+- doc/tasks/progress.md （总体进度）
+
+步骤：
+1. 根据需求文档和详细设计，为每一个模块生成Vibe Coding用的最小任务。
+2. 每个模块对应一个 <module-name>.md 文件，用check list表示子任务是否完成。
+3. progress.md中用check list表示每个模块是否已经完成，方便主Agent跟踪进度。
+```
+
+---
+
+## 五、生成Vibe Coding用的起始Prompt（给主Agent）
+```
+目标：
+生成Vibe Coding用的Prompt，作为整个项目的开发入口。
+
+输入：
+需求文档 doc/proposal.md
+详细设计 doc/detailed-design.md
+任务划分 doc/tasks
+
+输出：
+doc/prompt.md
+
+步骤：
+1. 阅读所有输入信息，了解当前要实现的工程。
+2. 生成doc/prompt.md作为Vibe Coding的起始Prompt，明确主Agent和子Agent的分工：
+   - 主Agent，用来跟踪整体的进度
+   - 主Agent生成子Agent，用来实现每一个模块，并完成测试
+   - 整个过程尽量减少人工参与，所有决策需有文档依据
+3. 明确编码规范：
+   - 代码必须有完整的pytest单元测试
+   - 所有代码必须通过mypy和ruff检测
+4. 生成prompt过程中，如果有任何不明确的地方都必须都向我提问。
+```
+
+查看doc/prompt.md并开始生成子agent，每个子Agent只负责一个模块，所有任务和进度都通过`doc/tasks/`下的文件管理，方便随时查看，启用所有子Agent协同工作，分工配合完成本次开发任务，各司其职同步输出结果。
