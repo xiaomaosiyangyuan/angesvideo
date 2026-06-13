@@ -60,10 +60,10 @@ def _run_serial(tasks, client, config, progress_callback, concat, concat_name):
 # ── 并行模式（新增） ──────────────────────────────
 def _run_parallel(tasks, client, config, progress_callback, concat, concat_name):
     total = len(tasks)
-    logger = logging.getLogger(__name__)
+    log = logging.getLogger("agnes_video_batch")
 
     # Phase 1: Generate reference images
-    logger.info("阶段1/4: 生成参考图...")
+    log.info("阶段1/4: 生成参考图...")
     for i, task in enumerate(tasks):
         if task.image_prompts and not task.image:
             urls = [client.generate_image(p, size=_image_size(task, config)) for p in task.image_prompts]
@@ -72,7 +72,7 @@ def _run_parallel(tasks, client, config, progress_callback, concat, concat_name)
             task.image = [client.generate_image(task.image_prompt, size=_image_size(task, config))]
 
     # Phase 2: Submit all tasks
-    logger.info("阶段2/4: 并行提交任务...")
+    log.info("阶段2/4: 并行提交任务...")
     pending: list[dict] = []  # {task, row_idx, video_id, start, attempt}
 
     for i, task in enumerate(tasks):
@@ -84,10 +84,10 @@ def _run_parallel(tasks, client, config, progress_callback, concat, concat_name)
             _report_progress(progress_callback, i + 1, total,
                              TaskResult(task=task, row_index=i + 1, status="failed", error_message=str(e)))
 
-    logger.info(f"  已提交 {len(pending)}/{total} 个任务")
+    log.info(f"  已提交 {len(pending)}/{total} 个任务")
 
     # Phase 3: Batch poll until all done
-    logger.info("阶段3/4: 轮询生成结果...")
+    log.info("阶段3/4: 轮询生成结果...")
     completed_videos: list[dict] = []
 
     while pending:
@@ -104,7 +104,7 @@ def _run_parallel(tasks, client, config, progress_callback, concat, concat_name)
                 completed_videos.append(p)
             elif status.status == "failed":
                 err = status.error or "生成失败"
-                logger.warning(f"  第{p['row_idx']}行 失败: {err}")
+                log.warning(f"  第{p['row_idx']}行 失败: {err}")
                 _report_progress(progress_callback, p["row_idx"], total,
                                  TaskResult(task=p["task"], row_index=p["row_idx"], status="failed",
                                             video_id=p["video_id"], error_message=err))
@@ -116,7 +116,7 @@ def _run_parallel(tasks, client, config, progress_callback, concat, concat_name)
             time.sleep(config.poll_interval)
 
     # Phase 4: Download all
-    logger.info(f"阶段4/4: 下载 {len(completed_videos)} 个视频...")
+    log.info(f"阶段4/4: 下载 {len(completed_videos)} 个视频...")
     results: list[TaskResult] = []
     for i, p in enumerate(completed_videos):
         try:

@@ -1,0 +1,93 @@
+我已经成功提取了飞书文档的所有内容，按章节整理如下：
+
+---
+
+# 机甲风游戏CG视频操作教程
+
+**前言**
+之前的教程有人还是看不懂，所以做了个视频
+（附视频教程）
+
+---
+
+## 第一步：生成角色图
+
+选择MJ模型生成，不要选错了，其他模型生成不了这种角色风格
+
+### 教程AI工具
+**网址：https://up.lk888.ai**
+
+这个网站工具是我自己多平台对比后发现性价比最高，大家要用的话自己用就行了，别乱传！
+
+### 男性角色提示词
+```
+futuristic AAA game character key visual, dark-skinned male cyber tactical warrior, strong facial structure, intense eyes, blue dreadlock mohawk, shaved sides with cyber tribal tattoos, bold white stripe paint across the forehead, facial piercings, wearing oversized tactical armor and military streetwear, blue white camouflage sleeves, futuristic yellow heavy weapon resting on shoulder, worn hard-surface armor, detailed metal parts, industrial mechanical accessories, rough matte textures, scratches and battle wear, clean white studio background, extreme close-up crop, asymmetrical composition, fashion editorial style, cinematic high-contrast lighting, ultra-detailed, realistic 3D character render, Unreal Engine 5, Octane render, AAA game promotional artwork, sharp focus --ar 16:9 --style raw --s 250 --v 7
+```
+
+### 女性角色提示词
+```
+futuristic AAA game character key visual, young female cyber tactical soldier, pale porcelain skin, cold and beautiful face, sharp blue eyes, sleek black hair with long blue braided cables, blue face decals and graphic paint on forehead and cheeks, wearing oversized high-tech tactical puffer armor, blue white black digital camouflage pattern, layered military streetwear, hard-surface armor details, futuristic sci-fi rifle held across the body, highly detailed fabric texture, glossy plastic, matte metal, carbon fiber elements, clean white studio background, giant bold blue typography behind the character, extreme close-up composition, fashion editorial layout, cinematic studio lighting, ultra-detailed, realistic 3D render, Unreal Engine 5, Octane render, AAA promotional poster, sharp focus --ar 16:9 --style raw --s 250 --v 7
+```
+
+---
+
+## 第二步：生成角色设定图
+
+### 角色设定板提示词
+```
+生成一张未来科幻战术角色设定板，整体为白底双页排版，16:9，风格类似 AAA 级射击游戏的官方角色档案页。画面包含两位角色，每位角色左右各占一页，每页都包含：角色名大标题、副标题、主视觉半身特写、全身立绘、武器展示、局部细节框、身份资料栏、概述文案、属性条、配色板、科技感装饰线与档案编号。角色风格为赛博朋克军事风、近未来战术机能风，人物写实偏半写实 3D 渲染，服装为数码迷彩、高科技战术装甲、硬表面装备。武器具有强烈科幻工业设计感。版面整洁克制，像官方美术设定集，背景纯白，信息密度高，设计专业，具有强烈的游戏角色世界观设定感。
+```
+
+---
+
+## 第三步：生成视频
+
+⚠️ 提示词里面的角色人名记得改成你们的角色设定图名字
+
+### 视频提示词1（角色档案展示片）
+```
+生成一条 15 秒 AAA 级科幻战术射击游戏角色预告片 
+
+整体风格为纯白背景的官方游戏角色档案展示片，不是战斗剧情片，而是高级角色设定板动态展示。视觉语言为未来军事机能风、赛博朋克战术装备、模块化 UI 数据面板、武器参数卡片、角色属性界面、蓝色与黄色点缀配色，高级 Unreal Engine 5 游戏渲染质感，角色材质真实，装备细节锐利，画面干净克制，具有官方 AAA 射击游戏预告片完成度。 
+
+镜头 1：男性角色 CABUDA-01 全身登场，手持黄色步枪，身穿深蓝迷彩战术服，未来机能装备，纯白背景。镜头缓慢推近。 
+
+镜头 2：CABUDA-01 角色资料界面，右侧是男角色全身像，左侧是未来科技数据面板，包含属性条、武器信息、身份编码、战术图标和蓝色 UI 模块。镜头从左向右平移。 
+
+镜头 3：女性角色 ZERO-07 全身登场，手持蓝色狙击枪，身穿蓝色数码迷彩战术服，带机械发辫与赛博植入细节。镜头缓慢推进。 
+
+镜头 4：女性角色面部极近特写，蓝色头发，面部战术涂装，耳部机械植入，右侧浮现透明武器数据面板。电影级浅景深，镜头缓慢推进。 
+
+镜头 5：男性角色头部侧面特写，蓝色脏辫发型，头皮纹身细节，面部涂装与耳饰清晰可见。左侧出现武器细节卡片，镜头缓慢横向移动。 
+
+镜头 6：女性角色手持蓝黑色狙击枪特写，手部握枪、战术手套、机械零件细节清晰，背景浮现半透明装备数据面板。 
+
+镜头 7：男性角色黄色黑色步枪结构特写，展示导轨、瞄准镜、枪管、弹匣、战术附件和蓝色点缀光效。画面叠加未来武器分析 UI，镜头有轻微视差移动。 
+
+镜头 8：男女双角色并列全身展示，男角色 CABUDA-01 手持黄色步枪，女角色 ZERO-07 手持蓝色狙击枪。周围环绕数据面板、武器卡片、角色属性、配色板。大全景构图，官方角色阵容展示感，镜头缓慢推进，最后进入干净标题卡。
+```
+
+### 视频提示词2（战斗剧情片 - 英文）
+```
+Cinematic sci-fi action scene, 15 seconds, 16:9, ultra high detail, epic blockbuster quality.
+
+CABUDA-01 and ZERO-07 fight side by side in a ruined flooded coastal city filled with neon reflections, heavy rain, sparks, mist, and smoke. A towering biomechanical sea-mech monster rises from the water.
+
+Low-angle tracking shot through rain and sparks. CABUDA-01 lands hard in shallow water and says, "Big one." ZERO-07 calmly replies, "Then don't miss."
+
+The monster fires a red energy blast. CABUDA-01 returns fire with a yellow-green rifle while ZERO-07 flanks for support.
+
+They stand back to back in the flooded neon street. CABUDA-01 shouts, "On my mark!" The monster lunges and exposes its glowing red chest core. CABUDA-01 slides under a massive mechanical arm and plants an explosive charge.
+
+ZERO-07 says, "Core exposed." CABUDA-01 answers, "Take it down."
+
+ZERO-07 fires a massive blue sniper beam as CABUDA-01 detonates the charge. The core explodes violently with fire, shockwaves, and metal debris.
+
+Final hero shot: both operatives walk forward through smoke and falling sparks, silhouetted by the explosion.
+
+Cinematic handheld action, smooth slow motion, dramatic rain, splashing water, volumetric lighting, high contrast, intense energy.
+```
+
+---
+
+✅ 所有内容已完整提取，包括所有提示词、代码块、章节结构、关键说明，无遗漏。
