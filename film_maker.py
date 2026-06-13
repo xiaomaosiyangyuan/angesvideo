@@ -1,284 +1,302 @@
 """
-胶片工坊 — 批量生图 → 运镜合成 → 加BGM → 加字幕
+胶片工坊 v3.2 — 全局统一前缀 + 多帧连续生成 + 帧插值 + 转场
 
 用法:
-  python film_maker.py --csv film_demo.csv --output film_output
-  
-  可选:
-    --bgm music.mp3      本地BGM文件
-    --bgm-url URL        在线BGM地址（自动下载）
-    --fps 24             帧率(默认24)
-    --resolution 1920x1080  分辨率(默认1920x1080)
-    --skip-images        跳过出图(直接复用已有图片)
+  # 每镜1张图 + 帧插值补到24fps (默认)
+  python film_maker.py --csv film_demo.csv -o film_output --seed 42
 
-BGM免费资源(商用可):
-  - Pixabay Music:    https://pixabay.com/music/
-  - DOVA-SYNDROME:    https://dova-s.jp
-  - Mixkit:           https://mixkit.co/free-stock-music/
-  - 魔王魂:           https://maou.audio
-  - YouTube Audio Lib:https://www.youtube.com/audiolibrary
+  # 每镜24张图/秒 → 直接逐帧播放 (最高连贯性)
+  python film_maker.py --csv film_demo.csv -o film_output --seed 42 --frames 24
+
+BGM:  --bgm music.mp3 或 --bgm-url URL
 """
 import argparse
 import csv
-import json
 import subprocess
-import sys
 import time
 from pathlib import Path
 
-# ── 常量 ──────────────────────────────────────────────
+import requests
+
 AGNES_IMAGE_URL = "https://apihub.agnes-ai.com/v1/images/generations"
 IMAGE_MODEL = "agnes-image-2.0-flash"
 FFMPEG = r"C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"
 API_KEY_FILE = r"C:\Users\Administrator\Documents\trae_projects\opencode\anges.txt"
 
-# ── Ken Burns 运镜 → FFmpeg zoompan 参数 ──────────────
-def _zoompan_expr(camera: str, duration: int, fps: int, w: int, h: int) -> str:
-    n_frames = duration * fps
-    zoom_step = 0.001
-    if camera == "zoom_in":
-        return f"scale={w}:{h}:flags=lanczos,zoompan=z='min(zoom+{zoom_step},{1.05})':d={n_frames}:s={w}x{h}:fps={fps}"
-    elif camera == "zoom_out":
-        return f"scale={w}:{h}:flags=lanczos,zoompan=z='max(zoom-{zoom_step},{1.0})':d={n_frames}:s={w}x{h}:fps={fps}"
-    elif camera == "pan_right":
-        return f"scale={int(w*1.05)}:{int(h*1.05)}:flags=lanczos,zoompan=z='{w}/{int(w*1.05)}':x='{int(w*0.05)}-{int(w*0.05)}*on/{n_frames}':d={n_frames}:s={w}x{h}:fps={fps}"
-    elif camera == "pan_left":
-        return f"scale={int(w*1.05)}:{int(h*1.05)}:flags=lanczos,zoompan=z='{w}/{int(w*1.05)}':x='{int(w*0.05)}*on/{n_frames}':d={n_frames}:s={w}x{h}:fps={fps}"
-    else:
-        return f"scale={w}:{h}:flags=lanczos"
+
+def _img_api(prompt: str, seed: int | None, headers: dict) -> bytes:
+    body = {"model": IMAGE_MODEL, "prompt": prompt, "n": 1, "size": "1152x768"}
+    if seed is not None:
+        body["seed"] = seed
+    r = requests.post(AGNES_IMAGE_URL, json=body, headers=headers, timeout=120)
+    r.raise_for_status()
+    url = r.json()["data"][0]["url"]
+    return requests.get(url, timeout=60).content
 
 
-# ── 步骤1: 批量生图 ─────────────────────────────────
-def step1_generate_images(csv_path: str, output_dir: Path, skip: bool = False) -> list[dict]:
-    """读取CSV，逐行生成图片，返回场景列表"""
-    import requests
-
+# ── 步骤1: 生图 ──────────────────────────────────────
+def step1_generate(csv_path: str, out_dir: Path, skip: bool, seed: int | None, frames: int) -> list[dict]:
     api_key = open(API_KEY_FILE, encoding="utf-8").readline().strip()
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    global_prefix = ""
 
     scenes = []
     with open(csv_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             sid = int(row.get("scene", "0"))
-            prompt = row.get("prompt", "")
-            duration = int(row.get("duration", "5"))
-            camera = row.get("camera", "static")
-            subtitle = row.get("subtitle", "")
-            scenes.append({"id": sid, "prompt": prompt, "duration": duration,
-                           "camera": camera, "subtitle": subtitle})
+            prefix = row.get("prompt_prefix", "")
+            suffix = row.get("prompt_suffix", "")
+            if prefix and not global_prefix:
+                global_prefix = prefix
+            full_prompt = f"{global_prefix} {suffix}".strip() if not prefix else f"{prefix} {suffix}".strip()
+            scenes.append({
+                "id": sid,
+                "prompt": full_prompt,
+                "duration": int(row.get("duration", "5")),
+                "camera": row.get("camera", "static"),
+                "subtitle": row.get("subtitle", ""),
+            })
 
-    img_dir = output_dir / "images"
+    img_dir = out_dir / "images"
     img_dir.mkdir(parents=True, exist_ok=True)
+    total_imgs = 0
 
     for s in scenes:
-        img_path = img_dir / f"{s['id']:04d}.png"
-        s["image"] = str(img_path)
+        if frames > 1:
+            # 多帧模式：每镜生成 duration × frames 张
+            n_per_shot = s["duration"] * frames
+            s["frames"] = []
+            for fi in range(n_per_shot):
+                pct = f"[帧{fi+1}/{n_per_shot} 进度{int((fi+1)/n_per_shot*100)}%]"
+                fp = img_dir / f"{s['id']:04d}_{fi:04d}.png"
+                s["frames"].append(str(fp))
+                if skip and fp.exists():
+                    continue
+                prompt = f"{s['prompt']} {pct}"
+                print(f"  [{s['id']:03d}_{fi:04d}] 生成...", end=" ", flush=True)
+                try:
+                    data = _img_api(prompt, seed, headers)
+                    with open(fp, "wb") as f:
+                        f.write(data)
+                    print(f"OK ({len(data)//1024}KB)")
+                    total_imgs += 1
+                    time.sleep(0.5)
+                except Exception as e:
+                    print(f"失败: {e}")
+        else:
+            # 单帧模式：每镜1张 + 后续zoompan
+            fp = img_dir / f"{s['id']:04d}.png"
+            s["image"] = str(fp)
+            if skip and Path(fp).exists():
+                print(f"  [{s['id']:03d}] 跳过")
+                continue
+            print(f"  [{s['id']:03d}] 生成...", end=" ", flush=True)
+            try:
+                data = _img_api(s["prompt"], seed, headers)
+                with open(fp, "wb") as f:
+                    f.write(data)
+                print(f"OK ({len(data)//1024}KB)")
+                total_imgs += 1
+                time.sleep(1)
+            except Exception as e:
+                print(f"失败: {e}")
 
-        if skip and img_path.exists():
-            print(f"  [{s['id']:03d}] 跳过（已存在）")
-            continue
-
-        print(f"  [{s['id']:03d}] 生成: {s['prompt'][:40]}...", end=" ", flush=True)
-        resp = requests.post(
-            AGNES_IMAGE_URL,
-            json={"model": IMAGE_MODEL, "prompt": s["prompt"], "n": 1, "size": "1152x768"},
-            headers=headers, timeout=120,
-        )
-        if not resp.ok:
-            print(f"失败: {resp.text[:100]}")
-            continue
-        url = resp.json()["data"][0]["url"]
-
-        # 下载图片
-        img_resp = requests.get(url, timeout=60)
-        with open(img_path, "wb") as f:
-            f.write(img_resp.content)
-        print(f"OK ({len(img_resp.content)//1024}KB)")
-
-        time.sleep(1)
-
+    print(f"  共 {total_imgs} 张")
     return scenes
 
 
-# ── 步骤2: 合成视频（Ken Burns + 过渡）───────────────
-def step2_build_video(scenes: list[dict], output_dir: Path, fps: int, resolution: str) -> Path:
-    """用FFmpeg逐段合成 + 拼接成最终视频"""
+# ── 步骤2: 合视频 ──────────────────────────────────────
+def step2_build(scenes: list[dict], out_dir: Path, fps: int, resolution: str, frames: int) -> Path:
     w, h = map(int, resolution.split("x"))
-    clips_dir = output_dir / "clips"
-    clips_dir.mkdir(parents=True, exist_ok=True)
+    cd = out_dir / "clips"
+    cd.mkdir(parents=True, exist_ok=True)
 
-    clip_files = []
-
+    clip_paths = []
     for s in scenes:
-        out_clip = clips_dir / f"clip_{s['id']:04d}.mp4"
-        clip_files.append(out_clip)
-
-        if out_clip.exists():
+        cp = cd / f"clip_{s['id']:04d}.mp4"
+        clip_paths.append(cp)
+        if cp.exists():
             continue
 
-        vf = _zoompan_expr(s["camera"], s["duration"], fps, w, h)
-        input_img = str(s["image"])
+        dur = s["duration"]
 
-        cmd = [
-            FFMPEG, "-y", "-loop", "1", "-i", input_img,
-            "-vf", vf,
-            "-c:v", "libx264", "-t", str(s["duration"]),
-            "-pix_fmt", "yuv420p", "-r", str(fps),
-            "-preset", "medium", "-crf", "18",
-            str(out_clip),
-        ]
-        subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
+        if frames > 1:
+            # 多帧模式：直接序列图片
+            flist = cd / f"_flist_{s['id']:04d}.txt"
+            with open(flist, "w", encoding="utf-8") as f:
+                for fp in s["frames"]:
+                    f.write(f"file '{Path(fp).resolve()}'\nduration 1\n")
+            # 最后一张重复一次
+            with open(flist, "a", encoding="utf-8") as f:
+                f.write(f"file '{Path(s['frames'][-1]).resolve()}'\n")
 
-    # 合成过渡
-    if len(clip_files) == 1:
-        final = output_dir / "raw_video.mp4"
-        cmd = [FFMPEG, "-y", "-i", str(clip_files[0]), "-c", "copy", str(final)]
-        subprocess.run(cmd, capture_output=True, check=True)
+            cmd = [
+                FFMPEG, "-y", "-f", "concat", "-safe", "0",
+                "-i", str(flist),
+                "-vf", f"scale={w}:{h}:flags=lanczos,fps={fps},fade=t=in:d=0.3,fade=t=out:st={dur-0.3}:d=0.3",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-preset", "medium", "-crf", "18",
+                str(cp),
+            ]
+            subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
+            flist.unlink()
+        else:
+            # 单帧模式：zoompan + minterpolate + fade
+            rate = 0.0005 if s["camera"].startswith("slow_") else 0.001
+            n = dur * fps
+            cam = s["camera"]
+            if cam in ("slow_zoom_in", "zoom_in"):
+                vf = f"scale={w}:{h}:flags=lanczos,zoompan=z='min(zoom+{rate},{1.05})':d={n}:s={w}x{h}:fps={fps}"
+            elif cam in ("slow_zoom_out", "zoom_out"):
+                vf = f"scale={w}:{h}:flags=lanczos,zoompan=z='max(zoom-{rate},{1.0})':d={n}:s={w}x{h}:fps={fps}"
+            elif cam == "slow_pan_right":
+                sw = int(w * 1.05)
+                vf = f"scale={sw}:{h}:flags=lanczos,zoompan=z='{w}/{sw}':x='{sw-w}-{sw-w}*on/{n}':d={n}:s={w}x{h}:fps={fps}"
+            elif cam == "slow_pan_left_follow":
+                sw = int(w * 1.05)
+                vf = f"scale={sw}:{h}:flags=lanczos,zoompan=z='{w}/{sw}':x='{sw-w}*on/{n}':d={n}:s={w}x{h}:fps={fps}"
+            elif cam == "slow_zoom_in_behind":
+                vf = f"scale={w}:{h}:flags=lanczos,zoompan=z='min(zoom+{rate*1.5},{1.08})':d={n}:s={w}x{h}:fps={fps}"
+            elif cam == "medium_zoom_in":
+                vf = f"scale={w}:{h}:flags=lanczos,zoompan=z='min(zoom+{rate*1.2},{1.06})':d={n}:s={w}x{h}:fps={fps}"
+            else:
+                vf = f"scale={w}:{h}:flags=lanczos"
+            vf += f",minterpolate=fps={fps}:mi_mode=mci"
+            vf += f",fade=t=in:d=0.3,fade=t=out:st={dur-0.3}:d=0.3"
+
+            cmd = [
+                FFMPEG, "-y", "-loop", "1", "-i", s["image"],
+                "-vf", vf, "-c:v", "libx264", "-t", str(dur),
+                "-pix_fmt", "yuv420p", "-r", str(fps),
+                "-preset", "medium", "-crf", "18", str(cp),
+            ]
+            subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
+
+    # 拼接（转场淡入淡出）
+    if len(clip_paths) == 1:
+        final = out_dir / "raw_video.mp4"
+        subprocess.run([FFMPEG, "-y", "-i", str(clip_paths[0]), "-c", "copy", str(final)],
+                       capture_output=True, check=True)
         return final
 
-    concat_path = output_dir / "_concat.txt"
-    with open(concat_path, "w", encoding="utf-8") as f:
-        for c in clip_files:
-            f.write(f"file '{c.resolve()}'\n")
+    xd = 0.5
+    cur = clip_paths[0]
+    for nxt in clip_paths[1:]:
+        mg = cd / f"_m_{nxt.stem}.mp4"
+        # 简化：直接concat（xfade复杂且剪辑时长不准）
+        fl = cd / "_c.txt"
+        with open(fl, "w") as f:
+            f.write(f"file '{cur.resolve()}'\nfile '{nxt.resolve()}'\n")
+        subprocess.run([
+            FFMPEG, "-y", "-f", "concat", "-safe", "0", "-i", str(fl),
+            "-c", "copy", str(mg),
+        ], capture_output=True, check=True, encoding="utf-8", errors="replace")
+        fl.unlink()
+        cur = mg
 
-    final_raw = output_dir / "raw_video.mp4"
-    cmd = [
-        FFMPEG, "-y", "-f", "concat", "-safe", "0",
-        "-i", str(concat_path),
-        "-c", "copy", str(final_raw),
-    ]
-    subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
-    concat_path.unlink()
-
-    return final_raw
-
-
-# ── 步骤3: 加BGM ────────────────────────────────────
-def step3_add_bgm(video_path: Path, bgm_path: str, output_path: Path):
-    """混入背景音乐，按视频时长循环/裁剪"""
-    cmd = [
-        FFMPEG, "-y",
-        "-i", str(video_path),
-        "-stream_loop", "-1", "-i", bgm_path,
-        "-filter_complex",
-        "[1:a]volume=0.3[a1];[0:a][a1]amix=inputs=2:duration=first[out]",
-        "-map", "0:v", "-map", "[out]",
-        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-        "-shortest",
-        str(output_path),
-    ]
-    subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
+    final = out_dir / "raw_video.mp4"
+    subprocess.run([FFMPEG, "-y", "-i", str(cur), "-c", "copy", str(final)],
+                   capture_output=True, check=True)
+    return final
 
 
-# ── 步骤4: 加字幕 ────────────────────────────────────
-def step4_add_subtitles(video_path: Path, scenes: list[dict], output_path: Path, font: str = "SimSun"):
-    """生成SRT字幕文件并用FFmpeg混入字幕流"""
-    srt_path = video_path.parent / "_subtitles.srt"
-    with open(srt_path, "w", encoding="utf-8") as f:
-        time_cursor = 0.0
+# ── 步骤3: BGM ──────────────────────────────────────
+def step3_bgm(v: Path, bgm: str, o: Path):
+    subprocess.run([
+        FFMPEG, "-y", "-i", str(v), "-stream_loop", "-1", "-i", bgm,
+        "-filter_complex", "[1:a]volume=0.3[a1];[0:a][a1]amix=inputs=2:duration=first[out]",
+        "-map", "0:v", "-map", "[out]", "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k", "-shortest", str(o),
+    ], capture_output=True, check=True, encoding="utf-8", errors="replace")
+
+
+# ── 步骤4: 字幕 ──────────────────────────────────────
+def step4_sub(v: Path, scenes: list[dict], o: Path):
+    srt = v.parent / "_s.srt"
+    t = 0.0
+    with open(srt, "w", encoding="utf-8") as f:
         for i, s in enumerate(scenes):
             if not s.get("subtitle"):
-                time_cursor += s["duration"]
+                t += s["duration"]
                 continue
-            start = time_cursor
-            end = time_cursor + s["duration"]
-            f.write(f"{i+1}\n")
-            f.write(f"{_srt_time(start)} --> {_srt_time(end)}\n")
-            f.write(f"{s['subtitle']}\n\n")
-            time_cursor = end
-
-    cmd = [
-        FFMPEG, "-y",
-        "-i", str(video_path),
-        "-i", str(srt_path),
-        "-c", "copy",
-        "-c:s", "mov_text",
-        "-metadata:s:s:0", "language=chi",
-        str(output_path),
-    ]
-    subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
-    srt_path.unlink()
+            end = t + s["duration"]
+            f.write(f"{i+1}\n{_ts(t)} --> {_ts(end)}\n{s['subtitle']}\n\n")
+            t = end
+    subprocess.run([
+        FFMPEG, "-y", "-i", str(v), "-i", str(srt),
+        "-c", "copy", "-c:s", "mov_text", "-metadata:s:s:0", "language=chi", str(o),
+    ], capture_output=True, check=True, encoding="utf-8", errors="replace")
+    srt.unlink()
 
 
-def _srt_time(seconds: float) -> str:
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = seconds % 60
+def _ts(sec: float) -> str:
+    h = int(sec // 3600)
+    m = int((sec % 3600) // 60)
+    s = sec % 60
     return f"{h:02d}:{m:02d}:{s:06.3f}".replace(".", ",")
 
 
-# ── 主流程 ───────────────────────────────────────────
+# ── Main ────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="胶片工坊 — 批量生图→运镜合成→加BGM→加字幕")
-    parser.add_argument("--csv", required=True, help="故事板CSV")
-    parser.add_argument("--output", "-o", default="./film_output", help="输出目录")
-    parser.add_argument("--bgm", help="背景音乐文件路径")
-    parser.add_argument("--bgm-url", help="在线BGM地址(自动下载)")
-    parser.add_argument("--fps", type=int, default=24, help="帧率")
-    parser.add_argument("--resolution", default="1920x1080", help="分辨率(默认1920x1080)")
-    parser.add_argument("--sub-font", default="SimSun", help="字幕字体")
-    parser.add_argument("--skip-images", action="store_true", help="跳过出图(复用已有)")
-    args = parser.parse_args()
+    p = argparse.ArgumentParser(description="胶片工坊 v3.2")
+    p.add_argument("--csv", required=True)
+    p.add_argument("--output", "-o", default="./film_output")
+    p.add_argument("--bgm")
+    p.add_argument("--bgm-url")
+    p.add_argument("--fps", type=int, default=24)
+    p.add_argument("--resolution", default="1920x1080")
+    p.add_argument("--skip-images", action="store_true")
+    p.add_argument("--seed", type=int, help="固定种子")
+    p.add_argument("--frames", type=int, default=1,
+                   help="每秒钟生成图数(1=每镜1张+插值, 24=每秒24张逐帧播放)")
+    args = p.parse_args()
 
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
 
     print("=" * 50)
-    print("胶片工坊 v1.0")
+    print("胶片工坊 v3.2")
+    print(f"  模式: {'多帧逐张' if args.frames > 1 else '单帧+插值'} (--frames {args.frames})")
+    if args.seed:
+        print(f"  种子: --seed {args.seed}")
     print("=" * 50)
 
-    # Step 1: 批量出图
-    print("\n[Step 1/4] 批量生成图片...")
-    scenes = step1_generate_images(args.csv, out, args.skip_images)
-    print(f"  完成: {len(scenes)} 张")
+    print("\n[1/4] 批量生成图片...")
+    scenes = step1_generate(args.csv, out, args.skip_images, args.seed, args.frames)
 
-    # Step 2: 合成视频
-    print("\n[Step 2/4] 合成视频（Ken Burns 运镜）...")
-    raw_video = step2_build_video(scenes, out, args.fps, args.resolution)
-    total_sec = sum(s["duration"] for s in scenes)
-    print(f"  完成: {raw_video.name} ({total_sec}s)")
+    print("\n[2/4] 合成视频...")
+    raw = step2_build(scenes, out, args.fps, args.resolution, args.frames)
+    total = sum(s["duration"] for s in scenes)
 
-    # Step 3: 加BGM
-    bgm_path = args.bgm
-    if args.bgm_url and not bgm_path:
-        import requests
-        print(f"\n[Step 3/4] 下载BGM...")
-        bgm_path = str(out / "_bgm.mp3")
-        resp = requests.get(args.bgm_url, timeout=120)
-        with open(bgm_path, "wb") as f:
-            f.write(resp.content)
-        print(f"  BGM下载完成 ({len(resp.content)//1024}KB)")
+    bgm = args.bgm
+    if args.bgm_url and not bgm:
+        print("\n[3/4] 下载BGM...")
+        bgm = str(out / "_bgm.mp3")
+        r = requests.get(args.bgm_url, timeout=120)
+        with open(bgm, "wb") as f:
+            f.write(r.content)
 
-    if bgm_path:
-        print("\n[Step 3/4] 添加背景音乐...")
-        bgm_video = out / "video_with_bgm.mp4"
-        step3_add_bgm(raw_video, bgm_path, bgm_video)
-        print(f"  完成: {bgm_video.name}")
-        current = bgm_video
+    if bgm:
+        print("\n[3/4] 添加BGM...")
+        bm = out / "v_bgm.mp4"
+        step3_bgm(raw, bgm, bm)
+        cur = bm
     else:
-        print("\n[Step 3/4] 跳过（无BGM）")
-        current = raw_video
+        print("\n[3/4] 跳过BGM")
+        cur = raw
 
-    # Step 4: 加字幕
-    has_sub = any(s.get("subtitle") for s in scenes)
-    if has_sub:
-        print("\n[Step 4/4] 添加字幕...")
+    if any(s.get("subtitle") for s in scenes):
+        print("\n[4/4] 添加字幕...")
         final = out / "final_cut.mp4"
-        step4_add_subtitles(current, scenes, final, args.sub_font)
-        print(f"  完成: {final.name}")
+        step4_sub(cur, scenes, final)
     else:
-        print("\n[Step 4/4] 跳过（无字幕）")
-        final = current
+        final = cur
 
-    # 统计
-    size_mb = final.stat().st_size / 1e6
-    print("\n" + "=" * 50)
-    print("[完成] 全部完成!")
-    print(f"   输出: {final}")
-    print(f"   时长: {total_sec}s ({total_sec/60:.1f}分钟)")
-    print(f"   大小: {size_mb:.1f} MB")
-    print(f"   图片: {len(scenes)} 张")
+    mb = final.stat().st_size / 1e6
+    print(f"\n{'='*50}")
+    print(f"[完成] {final.name}  ({total}s, {mb:.1f}MB)")
+    print(f"       图片: {sum(len(s.get('frames',[1])) for s in scenes)} 张")
     print("=" * 50)
 
 
