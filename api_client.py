@@ -57,12 +57,16 @@ class AgnesClient:
         if task.extra_body_mode is not None:
             extra["mode"] = task.extra_body_mode
 
+        is_keyframes = body.get("mode") == "keyframes"
+
         if task.image is not None:
-            body["image"] = task.image[0]
-            if len(task.image) > 1:
+            if is_keyframes:
                 extra["image"] = task.image
-                body["mode"] = "keyframes"
                 extra["mode"] = "keyframes"
+            else:
+                body["image"] = task.image[0]
+                if len(task.image) > 1:
+                    extra["image"] = task.image
 
         if extra:
             body["extra_body"] = extra

@@ -30,7 +30,7 @@ def read_tasks(csv_path: str) -> list[TaskConfig]:
         raise FileNotFoundError(f"CSV 文件不存在: {csv_path}")
 
     tasks: list[TaskConfig] = []
-    with path.open(encoding="utf-8") as f:
+    with path.open(encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
             raise CsvParseError("CSV 文件为空或缺少表头")
