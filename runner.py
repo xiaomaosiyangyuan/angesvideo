@@ -3,6 +3,7 @@ import signal
 import subprocess
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -71,18 +72,21 @@ def _run_parallel(tasks, client, config, progress_callback, concat, concat_name)
         elif task.image_prompt and not task.image:
             task.image = [client.generate_image(task.image_prompt, size=_image_size(task, config))]
 
-    # Phase 2: Submit all tasks
-    log.info("阶段2/4: 并行提交任务...")
-    pending: list[dict] = []  # {task, row_idx, video_id, start, attempt}
+    # Phase 2: Submit all tasks (10 concurrent threads)
+    log.info("并行提交任务...")
+    pending: list[dict] = []
 
-    for i, task in enumerate(tasks):
-        try:
-            video_id = client.submit_task(task, defaults=config)
-            pending.append({"task": task, "row_idx": i + 1, "video_id": video_id,
-                            "start": time.monotonic(), "attempt": 1})
-        except (ApiError, NetworkError) as e:
-            _report_progress(progress_callback, i + 1, total,
-                             TaskResult(task=task, row_index=i + 1, status="failed", error_message=str(e)))
+    def _submit(i, task):
+        vid = client.submit_task(task, defaults=config)
+        return {"task": task, "row_idx": i + 1, "video_id": vid, "start": time.monotonic(), "attempt": 1}
+
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = [ex.submit(_submit, i, task) for i, task in enumerate(tasks)]
+        for f in as_completed(futures):
+            try:
+                pending.append(f.result())
+            except (ApiError, NetworkError) as e:
+                log.warning(f"提交失败: {e}")
 
     log.info(f"  已提交 {len(pending)}/{total} 个任务")
 
