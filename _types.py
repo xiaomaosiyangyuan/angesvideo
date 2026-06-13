@@ -16,6 +16,7 @@ class TaskConfig:
     mode: str | None = None
     extra_body_image: list[str] | None = None
     extra_body_mode: str | None = None
+    subtitle: str | None = None
 
 
 @dataclass

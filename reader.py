@@ -15,6 +15,7 @@ FIELD_MAP = {
     "image_prompt": "image_prompt",
     "image_prompts": "image_prompts",
     "negative_prompt": "negative_prompt",
+    "subtitle": "subtitle",
     "mode": "mode",
     "extra_body_image": "extra_body_image",
     "extra_body_mode": "extra_body_mode",
