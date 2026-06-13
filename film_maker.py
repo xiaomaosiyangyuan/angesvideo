@@ -5,11 +5,18 @@
   python film_maker.py --csv film_demo.csv --output film_output
   
   可选:
-    --bgm music.mp3    添加背景音乐
-    --fps 24           帧率(默认24)
+    --bgm music.mp3      本地BGM文件
+    --bgm-url URL        在线BGM地址（自动下载）
+    --fps 24             帧率(默认24)
     --resolution 1920x1080  分辨率(默认1920x1080)
-    --sub-font 宋体    字幕字体
-    --skip-images      跳过出图(直接复用已有图片)
+    --skip-images        跳过出图(直接复用已有图片)
+
+BGM免费资源(商用可):
+  - Pixabay Music:    https://pixabay.com/music/
+  - DOVA-SYNDROME:    https://dova-s.jp
+  - Mixkit:           https://mixkit.co/free-stock-music/
+  - 魔王魂:           https://maou.audio
+  - YouTube Audio Lib:https://www.youtube.com/audiolibrary
 """
 import argparse
 import csv
@@ -207,6 +214,7 @@ def main():
     parser.add_argument("--csv", required=True, help="故事板CSV")
     parser.add_argument("--output", "-o", default="./film_output", help="输出目录")
     parser.add_argument("--bgm", help="背景音乐文件路径")
+    parser.add_argument("--bgm-url", help="在线BGM地址(自动下载)")
     parser.add_argument("--fps", type=int, default=24, help="帧率")
     parser.add_argument("--resolution", default="1920x1080", help="分辨率(默认1920x1080)")
     parser.add_argument("--sub-font", default="SimSun", help="字幕字体")
@@ -232,10 +240,20 @@ def main():
     print(f"  完成: {raw_video.name} ({total_sec}s)")
 
     # Step 3: 加BGM
-    if args.bgm:
+    bgm_path = args.bgm
+    if args.bgm_url and not bgm_path:
+        import requests
+        print(f"\n[Step 3/4] 下载BGM...")
+        bgm_path = str(out / "_bgm.mp3")
+        resp = requests.get(args.bgm_url, timeout=120)
+        with open(bgm_path, "wb") as f:
+            f.write(resp.content)
+        print(f"  BGM下载完成 ({len(resp.content)//1024}KB)")
+
+    if bgm_path:
         print("\n[Step 3/4] 添加背景音乐...")
         bgm_video = out / "video_with_bgm.mp4"
-        step3_add_bgm(raw_video, args.bgm, bgm_video)
+        step3_add_bgm(raw_video, bgm_path, bgm_video)
         print(f"  完成: {bgm_video.name}")
         current = bgm_video
     else:
