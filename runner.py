@@ -218,29 +218,64 @@ def _image_size(task: TaskConfig, config: AppConfig) -> str:
 
 
 def _concat_videos(results: list[TaskResult], output_dir: str, concat_name: str) -> Path | None:
-    success_files = [Path(r.output_path) for r in results if r.status == "success" and r.output_path]
-    if len(success_files) < 2:
+    success = [r for r in results if r.status == "success" and r.output_path]
+    if len(success) < 2:
         return None
 
     out_dir = Path(output_dir)
-    concat_list = out_dir / "_concat_list.txt"
-    with open(concat_list, "w", encoding="utf-8") as f:
-        for p in success_files:
-            f.write(f"file '{p.resolve()}'\n")
+    xfade_dur = 0.5
+
+    # Calculate durations from TaskConfig
+    def _dur(r: TaskResult) -> float:
+        n = r.task.num_frames or 121
+        f = r.task.frame_rate or 24
+        return n / f
+
+    # Chain xfade transitions with resolution normalization
+    current = Path(success[0].output_path)
+    # Use ffprobe JSON to get resolution
+    import json
+    probe = subprocess.run(
+        [FFMPEG_PATH, "-v", "quiet", "-print_format", "json", "-show_streams", str(current.resolve())],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    tw, th = 1152, 768
+    try:
+        info = json.loads(probe.stdout)
+        for stream in info.get("streams", []):
+            if stream.get("codec_type") == "video":
+                tw = int(stream.get("width", tw))
+                th = int(stream.get("height", th))
+                break
+    except (json.JSONDecodeError, KeyError, ValueError):
+        pass
+
+    for i in range(1, len(success)):
+        d = _dur(success[i - 1])
+        merged = out_dir / f"_xfade_{i:04d}.mp4"
+        cmd = [
+            FFMPEG_PATH, "-y",
+            "-i", str(current.resolve()),
+            "-i", str(Path(success[i].output_path).resolve()),
+            "-filter_complex",
+            f"[0:v]scale={tw}:{th}:flags=lanczos[v0];[1:v]scale={tw}:{th}:flags=lanczos[v1];[v0][v1]xfade=transition=fade:duration={xfade_dur}:offset={d - xfade_dur}[out]",
+            "-map", "[out]",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            "-pix_fmt", "yuv420p",
+            "-an",
+            str(merged.resolve()),
+        ]
+        subprocess.run(cmd, capture_output=True, check=True, encoding="utf-8", errors="replace")
+        current = merged
 
     out_path = out_dir / concat_name
-    try:
-        subprocess.run(
-            [FFMPEG_PATH, "-y", "-f", "concat", "-safe", "0",
-             "-i", str(concat_list.resolve()), "-c", "copy", str(out_path.resolve())],
-            capture_output=True, text=True, check=True, encoding="utf-8", errors="replace",
-        )
-        logger = logging.getLogger(__name__)
-        logger.info(f"视频拼接完成: {out_path} ({out_path.stat().st_size / 1e6:.1f} MB)")
-        return out_path
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        logging.getLogger(__name__).warning(f"视频拼接失败: {e}")
-        return None
-    finally:
-        if concat_list.exists():
-            concat_list.unlink()
+    subprocess.run([FFMPEG_PATH, "-y", "-i", str(current.resolve()), "-c", "copy", str(out_path.resolve())],
+                   capture_output=True, check=True, encoding="utf-8", errors="replace")
+
+    # Cleanup temp files
+    for f in out_dir.glob("_xfade_*.mp4"):
+        f.unlink()
+
+    logger = logging.getLogger(__name__)
+    logger.info(f"视频拼接完成(含转场): {out_path} ({out_path.stat().st_size / 1e6:.1f} MB)")
+    return out_path
