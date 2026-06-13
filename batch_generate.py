@@ -70,7 +70,12 @@ def main() -> None:
             msg += f" - {result.error_message}"
         logger.info(msg)
 
-    results = runner.run_batch(tasks, client, config, progress_callback=progress_callback)
+    results = runner.run_batch(
+        tasks, client, config,
+        progress_callback=progress_callback,
+        concat=args.concat,
+        concat_name=args.concat_name,
+    )
 
     csv_path = reporter.write_results_csv(results, config.output_dir)
     logger.info(f"结果报告已保存: {csv_path}")

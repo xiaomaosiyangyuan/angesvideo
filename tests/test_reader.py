@@ -45,6 +45,12 @@ class TestReadTasks:
         assert tasks[0].image_prompt == "Cyberpunk city rainy night neon lights"
         assert tasks[0].prompt == "Cinematic drone shot"
 
+    def test_image_prompts_parsing(self) -> None:
+        tasks = read_tasks(str(FIXTURES / "image_prompts.csv"))
+        assert len(tasks) == 1
+        assert tasks[0].image_prompts == ["人物主体设计提示词", "道具特写提示词", "场景背景提示词"]
+        assert tasks[0].prompt == "Multi-asset scene"
+
     def test_file_not_found(self) -> None:
         with pytest.raises(FileNotFoundError):
             read_tasks("/nonexistent/file.csv")

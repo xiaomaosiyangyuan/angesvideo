@@ -78,8 +78,9 @@ class TestAgnesClient:
 
         client.submit_task(task)
         body = mock_session.post.call_args[1]["json"]
-        assert body["image"] == ["a.jpg", "b.jpg", "c.jpg"]
-        assert isinstance(body["image"], list)
+        assert body["image"] == "a.jpg"
+        assert isinstance(body["image"], str)
+        assert body["extra_body"]["image"] == ["a.jpg", "b.jpg", "c.jpg"]
 
     @patch("api_client.requests.Session")
     def test_generate_image_success(self, mock_session_cls: Mock) -> None:

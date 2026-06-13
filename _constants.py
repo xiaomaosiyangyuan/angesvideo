@@ -17,3 +17,5 @@ DOWNLOAD_RETRY_DELAY = 5
 
 IMAGE_MODEL = "agnes-image-2.0-flash"
 DEFAULT_IMAGE_SIZE = "1152x768"
+
+FFMPEG_PATH = r"C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Lib\site-packages\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe"

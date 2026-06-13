@@ -1,9 +1,12 @@
+import logging
 import signal
+import subprocess
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
+from _constants import FFMPEG_PATH
 from _exceptions import ApiError, NetworkError
 from _types import AppConfig, TaskConfig, TaskResult, TaskStatus
 from api_client import AgnesClient
@@ -16,6 +19,8 @@ def run_batch(
     client: AgnesClient,
     config: AppConfig,
     progress_callback: ProgressCallback | None = None,
+    concat: bool = False,
+    concat_name: str = "final_cut.mp4",
 ) -> list[TaskResult]:
     results: list[TaskResult] = []
     interrupted = False
@@ -48,6 +53,10 @@ def run_batch(
             progress_callback(i + 1, total, result)
 
     signal.signal(signal.SIGINT, original_handler)
+
+    if concat:
+        _concat_videos(results, config.output_dir, concat_name)
+
     return results
 
 
@@ -70,7 +79,13 @@ def _execute_single_task(
             )
 
         try:
-            if task.image_prompt and not task.image:
+            if task.image_prompts and not task.image:
+                urls = []
+                for i, p in enumerate(task.image_prompts):
+                    url = client.generate_image(p, size=_image_size(task, config))
+                    urls.append(url)
+                task.image = urls
+            elif task.image_prompt and not task.image:
                 image_url = client.generate_image(
                     task.image_prompt,
                     size=_image_size(task, config),
@@ -151,4 +166,39 @@ def _image_size(task: TaskConfig, config: AppConfig) -> str:
     w = task.width or config.default_width
     h = task.height or config.default_height
     return f"{w}x{h}"
+
+
+def _concat_videos(results: list[TaskResult], output_dir: str, concat_name: str) -> Path | None:
+    success_files = [
+        Path(r.output_path) for r in results
+        if r.status == "success" and r.output_path
+    ]
+    if len(success_files) < 2:
+        return None
+
+    out_dir = Path(output_dir)
+    concat_list = out_dir / "_concat_list.txt"
+    with open(concat_list, "w", encoding="utf-8") as f:
+        for p in success_files:
+            f.write(f"file '{p.resolve()}'\n")
+
+    out_path = out_dir / concat_name
+    try:
+        result = subprocess.run(
+            [FFMPEG_PATH, "-y", "-f", "concat", "-safe", "0",
+             "-i", str(concat_list.resolve()), "-c", "copy", str(out_path.resolve())],
+            capture_output=True, text=True, check=True,
+            encoding="utf-8", errors="replace",
+        )
+        size = out_path.stat().st_size
+        logger = logging.getLogger(__name__)
+        logger.info(f"视频拼接完成: {out_path} ({size / 1e6:.1f} MB)")
+        return out_path
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logger = logging.getLogger(__name__)
+        logger.warning(f"视频拼接失败: {e}")
+        return None
+    finally:
+        if concat_list.exists():
+            concat_list.unlink()
 

@@ -56,14 +56,14 @@ class AgnesClient:
             extra["image"] = task.extra_body_image
         if task.extra_body_mode is not None:
             extra["mode"] = task.extra_body_mode
-        if extra:
-            body["extra_body"] = extra
 
         if task.image is not None:
-            if len(task.image) == 1:
-                body["image"] = task.image[0]
-            else:
-                body["image"] = task.image
+            body["image"] = task.image[0]
+            if len(task.image) > 1:
+                extra["image"] = task.image
+
+        if extra:
+            body["extra_body"] = extra
 
         try:
             resp = self._session.post(

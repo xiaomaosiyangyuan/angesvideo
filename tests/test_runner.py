@@ -169,3 +169,64 @@ class TestRunBatchWithImagePrompt:
 
         run_batch([task], client, config)
         client.generate_image.assert_not_called()
+
+
+class TestRunBatchWithImagePrompts:
+    def test_generates_multiple_images(self) -> None:
+        from runner import run_batch
+        from api_client import AgnesClient
+
+        client = Mock(spec=AgnesClient)
+        client.generate_image.side_effect = [
+            "https://example.com/img1.png",
+            "https://example.com/img2.png",
+            "https://example.com/img3.png",
+        ]
+        client.submit_task.return_value = "vid_1"
+        client.query_task.return_value = Mock(
+            status="completed", video_url="https://example.com/v.mp4",
+        )
+        client.download_video.return_value = "/tmp/vid_1.mp4"
+
+        task = TaskConfig(
+            prompt="video prompt",
+            image_prompts=["prompt1", "prompt2", "prompt3"],
+        )
+        config = AppConfig(api_key="test", output_dir="/tmp/out", max_retries=3, poll_interval=1)
+
+        results = run_batch([task], client, config)
+        assert len(results) == 1
+        assert results[0].status == "success"
+
+        assert client.generate_image.call_count == 3
+        submitted = client.submit_task.call_args[0][0]
+        assert submitted.image == [
+            "https://example.com/img1.png",
+            "https://example.com/img2.png",
+            "https://example.com/img3.png",
+        ]
+
+    def test_image_prompts_takes_priority_over_image_prompt(self) -> None:
+        from runner import run_batch
+        from api_client import AgnesClient
+
+        client = Mock(spec=AgnesClient)
+        client.generate_image.side_effect = [
+            "https://example.com/m1.png",
+            "https://example.com/m2.png",
+        ]
+        client.submit_task.return_value = "vid_1"
+        client.query_task.return_value = Mock(
+            status="completed", video_url="https://example.com/v.mp4",
+        )
+        client.download_video.return_value = "/tmp/vid_1.mp4"
+
+        task = TaskConfig(
+            prompt="test",
+            image_prompt="singular should be ignored",
+            image_prompts=["multi1", "multi2"],
+        )
+        config = AppConfig(api_key="test", output_dir="/tmp/out", max_retries=3, poll_interval=1)
+
+        run_batch([task], client, config)
+        assert client.generate_image.call_count == 2

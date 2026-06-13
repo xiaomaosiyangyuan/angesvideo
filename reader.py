@@ -13,6 +13,7 @@ FIELD_MAP = {
     "seed": "seed",
     "image": "image",
     "image_prompt": "image_prompt",
+    "image_prompts": "image_prompts",
     "negative_prompt": "negative_prompt",
     "mode": "mode",
     "extra_body_image": "extra_body_image",
@@ -20,7 +21,7 @@ FIELD_MAP = {
 }
 
 INT_FIELDS = {"width", "height", "num_frames", "frame_rate", "seed"}
-LIST_FIELDS = {"image", "extra_body_image"}
+LIST_FIELDS = {"image", "image_prompts", "extra_body_image"}
 
 
 def read_tasks(csv_path: str) -> list[TaskConfig]:
