@@ -12,6 +12,7 @@ FIELD_MAP = {
     "frame_rate": "frame_rate",
     "seed": "seed",
     "image": "image",
+    "image_prompt": "image_prompt",
     "negative_prompt": "negative_prompt",
     "mode": "mode",
     "extra_body_image": "extra_body_image",

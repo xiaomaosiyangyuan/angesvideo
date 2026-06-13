@@ -39,6 +39,12 @@ class TestReadTasks:
         assert len(tasks) == 1
         assert tasks[0].image == ["a.jpg", "b.jpg", "c.jpg"]
 
+    def test_image_prompt_parsing(self) -> None:
+        tasks = read_tasks(str(FIXTURES / "image_prompt.csv"))
+        assert len(tasks) == 1
+        assert tasks[0].image_prompt == "Cyberpunk city rainy night neon lights"
+        assert tasks[0].prompt == "Cinematic drone shot"
+
     def test_file_not_found(self) -> None:
         with pytest.raises(FileNotFoundError):
             read_tasks("/nonexistent/file.csv")

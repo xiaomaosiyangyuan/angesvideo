@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 
 from _types import TaskConfig, AppConfig, TaskResult
-from runner import _build_output_filename, _backoff_delay
+from runner import _build_output_filename, _backoff_delay, _image_size
 
 
 class TestBuildOutputFilename:
@@ -110,3 +110,62 @@ class TestRunBatch:
         assert len(calls) == 2
         assert calls[0] == (1, 2, calls[0][2])
         assert calls[1] == (2, 2, calls[1][2])
+
+
+class TestImageSize:
+    def test_uses_task_dimensions(self) -> None:
+        config = AppConfig(api_key="test")
+        task = TaskConfig(width=1920, height=1080)
+        assert _image_size(task, config) == "1920x1080"
+
+    def test_falls_back_to_defaults(self) -> None:
+        config = AppConfig(api_key="test", default_width=1152, default_height=768)
+        task = TaskConfig()
+        assert _image_size(task, config) == "1152x768"
+
+    def test_mixed_defaults(self) -> None:
+        config = AppConfig(api_key="test", default_width=1280, default_height=720)
+        task = TaskConfig(width=1920)
+        assert _image_size(task, config) == "1920x720"
+
+
+class TestRunBatchWithImagePrompt:
+    def test_generates_image_before_video(self) -> None:
+        from runner import run_batch
+        from api_client import AgnesClient
+
+        client = Mock(spec=AgnesClient)
+        client.generate_image.return_value = "https://example.com/gen_img.png"
+        client.submit_task.return_value = "vid_1"
+        client.query_task.return_value = Mock(
+            status="completed", video_url="https://example.com/v.mp4",
+        )
+        client.download_video.return_value = "/tmp/vid_1.mp4"
+
+        task = TaskConfig(prompt="video prompt", image_prompt="image prompt")
+        config = AppConfig(api_key="test", output_dir="/tmp/out", max_retries=3, poll_interval=1)
+
+        results = run_batch([task], client, config)
+        assert len(results) == 1
+        assert results[0].status == "success"
+
+        client.generate_image.assert_called_once_with("image prompt", size="1152x768")
+        submitted = client.submit_task.call_args[0][0]
+        assert submitted.image == ["https://example.com/gen_img.png"]
+
+    def test_skips_image_generation_when_image_already_set(self) -> None:
+        from runner import run_batch
+        from api_client import AgnesClient
+
+        client = Mock(spec=AgnesClient)
+        client.submit_task.return_value = "vid_1"
+        client.query_task.return_value = Mock(
+            status="completed", video_url="https://example.com/v.mp4",
+        )
+        client.download_video.return_value = "/tmp/vid_1.mp4"
+
+        task = TaskConfig(prompt="test", image=["https://existing.jpg"], image_prompt="should be ignored")
+        config = AppConfig(api_key="test", output_dir="/tmp/out", max_retries=3, poll_interval=1)
+
+        run_batch([task], client, config)
+        client.generate_image.assert_not_called()

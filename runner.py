@@ -70,6 +70,13 @@ def _execute_single_task(
             )
 
         try:
+            if task.image_prompt and not task.image:
+                image_url = client.generate_image(
+                    task.image_prompt,
+                    size=_image_size(task, config),
+                )
+                task.image = [image_url]
+
             video_id = client.submit_task(task, defaults=config)
 
             task_status = _poll_until_complete(
@@ -138,4 +145,10 @@ def _build_output_filename(row_index: int, prompt: str) -> str:
     sanitized = "".join(c if c.isalnum() or c in (" ", "-", "_") else "_" for c in prompt)
     sanitized = sanitized[:20].strip()
     return f"{row_index:04d}_{sanitized}_{ts}.mp4"
+
+
+def _image_size(task: TaskConfig, config: AppConfig) -> str:
+    w = task.width or config.default_width
+    h = task.height or config.default_height
+    return f"{w}x{h}"
 

@@ -10,6 +10,7 @@ class TaskConfig:
     frame_rate: int | None = None
     seed: int | None = None
     image: list[str] | None = None
+    image_prompt: str | None = None
     negative_prompt: str | None = None
     mode: str | None = None
     extra_body_image: list[str] | None = None

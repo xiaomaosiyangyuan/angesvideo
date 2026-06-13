@@ -13,7 +13,7 @@ def write_results_csv(results: list[TaskResult], output_dir: str) -> Path:
     fieldnames = [
         "row_index", "status", "prompt", "width", "height",
         "num_frames", "frame_rate", "seed", "mode",
-        "image", "extra_body_image",
+        "image_prompt", "image", "extra_body_image",
         "video_id", "output_path", "error_message", "duration_seconds",
     ]
 
@@ -31,6 +31,7 @@ def write_results_csv(results: list[TaskResult], output_dir: str) -> Path:
                 "frame_rate": r.task.frame_rate or "",
                 "seed": r.task.seed or "",
                 "mode": r.task.mode or "",
+                "image_prompt": r.task.image_prompt or "",
                 "image": "|".join(r.task.image) if r.task.image else "",
                 "extra_body_image": "|".join(r.task.extra_body_image) if r.task.extra_body_image else "",
                 "video_id": r.video_id or "",

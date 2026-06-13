@@ -12,6 +12,7 @@ class TestTaskConfig:
         assert t.frame_rate is None
         assert t.seed is None
         assert t.image is None
+        assert t.image_prompt is None
         assert t.negative_prompt is None
         assert t.mode is None
         assert t.extra_body_image is None

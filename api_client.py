@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from _constants import DOWNLOAD_RETRIES, DOWNLOAD_RETRY_DELAY
+from _constants import DOWNLOAD_RETRIES, DOWNLOAD_RETRY_DELAY, IMAGE_MODEL, DEFAULT_IMAGE_SIZE
 from _exceptions import ApiError, NetworkError
 from _types import AppConfig, TaskConfig, TaskStatus
 
@@ -114,6 +114,37 @@ class AgnesClient:
             )
 
         raise NetworkError(f"所有查询端点均失败: {'; '.join(errors)}")
+
+    def generate_image(self, prompt: str, size: str = DEFAULT_IMAGE_SIZE) -> str:
+        body = {
+            "model": IMAGE_MODEL,
+            "prompt": prompt,
+            "n": 1,
+            "size": size,
+        }
+        try:
+            resp = self._session.post(
+                f"{self.base_url}/v1/images/generations",
+                json=body,
+                timeout=(30, 120),
+            )
+        except requests.exceptions.Timeout as e:
+            raise NetworkError(f"图片生成超时: {e}") from e
+        except requests.exceptions.ConnectionError as e:
+            raise NetworkError(f"网络连接失败: {e}") from e
+
+        if not resp.ok:
+            raise ApiError(resp.status_code, resp.text)
+
+        data = resp.json()
+        image_url: str | None = None
+        if isinstance(data.get("data"), list) and len(data["data"]) > 0:
+            image_url = data["data"][0].get("url")
+
+        if not image_url:
+            raise ApiError(resp.status_code, resp.text, "图片生成响应中未找到 URL")
+
+        return image_url
 
     def download_video(self, video_url: str, output_path: str | Path) -> Path:
         output_path = Path(output_path)
