@@ -206,6 +206,11 @@ class TestRunBatchWithImagePrompts:
             "https://example.com/img3.png",
         ]
 
+        kwargs = client.submit_task.call_args[1]
+        assert kwargs.get("defaults") is not None
+        # The submit_task received task should trigger keyframe mode
+        # (verified by api_client test separately)
+
     def test_image_prompts_takes_priority_over_image_prompt(self) -> None:
         from runner import run_batch
         from api_client import AgnesClient

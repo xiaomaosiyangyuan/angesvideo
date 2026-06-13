@@ -80,7 +80,9 @@ class TestAgnesClient:
         body = mock_session.post.call_args[1]["json"]
         assert body["image"] == "a.jpg"
         assert isinstance(body["image"], str)
+        assert body["mode"] == "keyframes"
         assert body["extra_body"]["image"] == ["a.jpg", "b.jpg", "c.jpg"]
+        assert body["extra_body"]["mode"] == "keyframes"
 
     @patch("api_client.requests.Session")
     def test_generate_image_success(self, mock_session_cls: Mock) -> None:

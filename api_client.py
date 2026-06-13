@@ -61,6 +61,8 @@ class AgnesClient:
             body["image"] = task.image[0]
             if len(task.image) > 1:
                 extra["image"] = task.image
+                body["mode"] = "keyframes"
+                extra["mode"] = "keyframes"
 
         if extra:
             body["extra_body"] = extra
