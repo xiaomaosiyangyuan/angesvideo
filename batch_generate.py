@@ -75,6 +75,7 @@ def main() -> None:
         progress_callback=progress_callback,
         concat=args.concat,
         concat_name=args.concat_name,
+        parallel=args.parallel,
     )
 
     csv_path = reporter.write_results_csv(results, config.output_dir)

@@ -15,4 +15,5 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--log", type=str, default=DEFAULT_LOG_FILE, help="日志文件路径")
     parser.add_argument("--concat", action="store_true", help="生成完成后自动拼接所有视频")
     parser.add_argument("--concat-name", type=str, default="final_cut.mp4", help="拼接输出文件名")
+    parser.add_argument("--parallel", action="store_true", help="并行提交所有任务(先全部提交再统一轮询)")
     return parser.parse_args(argv)
