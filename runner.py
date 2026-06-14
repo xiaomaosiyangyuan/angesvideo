@@ -54,7 +54,7 @@ def _run_serial(tasks, client, config, progress_callback, concat, concat_name):
 
     signal.signal(signal.SIGINT, original_handler)
     if concat:
-        _concat_videos(results, config.output_dir, concat_name)
+        _concat_videos_simple(results, config.output_dir, concat_name)
     return results
 
 
@@ -283,3 +283,42 @@ def _concat_videos(results: list[TaskResult], output_dir: str, concat_name: str)
     logger = logging.getLogger(__name__)
     logger.info(f"视频拼接完成(含转场): {out_path} ({out_path.stat().st_size / 1e6:.1f} MB)")
     return out_path
+
+
+def _concat_videos_simple(results: list, output_dir: str, concat_name: str) -> Path | None:
+    """快速拼接: 直接-c copy"""
+    import re
+    success = []
+    # Try from results first
+    for r in results:
+        if r.status == "success" and r.output_path:
+            p = Path(r.output_path)
+            if p.exists():
+                success.append(p)
+    # Fallback: scan output dir for video clips (match leading digits)
+    if len(success) < 2:
+        out_dir = Path(output_dir)
+        all_mp4 = [f for f in out_dir.iterdir() if f.suffix == ".mp4" and re.match(r"\d{4}", f.name)]
+        success = sorted(all_mp4, key=lambda f: int(re.match(r"(\d+)", f.name).group(1)))
+    if len(success) < 2:
+        return None
+    out_dir = Path(output_dir)
+    flist = out_dir / "_c.txt"
+    with open(flist, "w", encoding="utf-8") as f:
+        for p in success:
+            f.write(f"file '{p.resolve()}'\n")
+    out_path = out_dir / concat_name
+    try:
+        subprocess.run([FFMPEG_PATH, "-y", "-f", "concat", "-safe", "0",
+            "-i", str(flist), "-c", "copy", str(out_path)],
+            capture_output=True, check=True, encoding="utf-8", errors="replace")
+        sz = out_path.stat().st_size
+        log = logging.getLogger(__name__)
+        log.info(f"视频拼接完成: {out_path} ({sz/1e6:.1f} MB)")
+        return out_path
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"视频拼接失败: {e}")
+        return None
+    finally:
+        if flist.exists():
+            flist.unlink()

@@ -3,7 +3,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.pyc
-*.mp4
 *.log
 output/
 film_output/
